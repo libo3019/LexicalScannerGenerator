@@ -1,0 +1,38 @@
+case
+//comment1
+123456789
+//comment2
+FILE
+while
+//comment3
+continue
+/*the
+file
+can't be
+opened.
+*/
+for
+/*the1
+file1
+can't be1
+opened1.
+*/
+void
+
+asm { 
+ push ebp
+ mov ebp, esp
+ sub esp, 100
+ add esp, 100
+ pop ebp
+ ret
+}
+while
+
+sql
+
+{
+ select * from data;
+ update * from data;
+   }
+struct

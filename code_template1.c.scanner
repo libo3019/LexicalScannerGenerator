@@ -1,0 +1,342 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <stdarg.h>
+
+#ifdef _MSC_VER
+
+#ifdef DEBUG
+#define dbg(fmt, ...) fprintf(stderr, "%s " fmt "\n", __FUNCTION__, ##__VA_ARGS__)
+#else
+#define dbg(fmt, ...)
+#endif
+
+#else
+
+#ifdef DEBUG
+#define dbg(fmt, arg...) fprintf(stderr, "%s " fmt "\n", __FUNCTION__, ##arg)
+#else
+#define dbg(fmt, arg...)
+#endif
+
+#endif
+
+%declare_code
+
+FILE *yyout = NULL;	/* default output file */
+
+#ifndef MAX_ERROR_INFO_SIZE
+#define MAX_ERROR_INFO_SIZE 3000
+#endif
+
+/* error handle */
+static void yyerrx(char *fmt, ...)
+{
+	char info[MAX_ERROR_INFO_SIZE];
+	va_list args;
+    va_start(args, fmt);
+	vsnprintf(info, sizeof(info) - 1, fmt, args);
+	info[sizeof(info) - 1] = '\0';
+	va_end(args);
+	if (errno)
+		perror(info);
+	else
+		fprintf(stderr, "ERROR: %s\n", info);
+	exit(EXIT_FAILURE);
+}
+
+/* yylex() output text stream */
+char *yytext;
+int yyleng;
+int yylineno;
+
+static char *yysmark;		/* start mark for yytext */
+static char *yyemark;		/* end mark for yytext */
+
+static char *yy_text(void)
+{
+	return yysmark;
+}
+
+static int yy_leng(void)
+{
+	return yyemark - yysmark;
+}
+
+/* low-level I/O stream */
+#define YY_AHEADSIZE 16
+#define YY_BUFSIZE 4096
+
+#define YY_LOOKAHEAD (&yyend[-YY_AHEADSIZE])
+#define YY_BUF_START (&yybuf[0])
+#define YY_BUF_END (&yybuf[YY_BUFSIZE])
+
+static char yybuf[YY_BUFSIZE];
+static char *yyend;		/* current buffer end */
+static char *yypos;		/* current position of I/O stream */
+
+FILE* yyin = NULL;		/* default input file is standard input */
+
+static int yyeof;
+static int yyreallineno;
+static int yyprevlineno;
+static int yystartstate = 0;
+
+static void yy_init(void)
+{
+	yypos = YY_BUF_START;
+	*yypos = '\n';		/* first line start anchor `^` */
+	yyend = YY_BUF_START + 1;
+	yysmark = yyemark = YY_BUF_START;
+	yyeof = 0;
+	yytext = "";
+	yyleng = 0;
+	yylineno = 0;
+	yyreallineno = 0;
+	/* default */
+	if (!yyin)
+		yyin = stdin;
+	if (!yyout)
+		yyout = stdout;
+}
+
+static int yy_lookahead(void)
+{
+	if (yypos < yyend)
+		return *yypos;
+	else
+		return EOF;
+}
+
+static void yy_save_buf(void)
+{
+	char *p;
+	int marklen;
+	int poslen;
+	marklen = yyemark - yysmark;
+	poslen = yypos - yysmark;
+
+	p = YY_BUF_START;
+
+	while (yysmark < yyend)
+		*p++ = *yysmark++;
+
+	yysmark = YY_BUF_START;
+	yyemark = yysmark + marklen;
+	yypos = yysmark + poslen;
+	yyend = p;
+}
+
+static void yy_fill_buf(void)
+{
+	int n;
+	if (yysmark < yyend)
+		yy_save_buf();
+	n = fread(yyend, 1, YY_BUF_END - yyend, yyin);
+	if (ferror(yyin)) {
+		yyerrx("read");
+	} else if (n > 0) {
+		yyend += n;
+	} else {
+		yyend[0] = '\n';
+		++yyend;
+		yyeof = 1;
+	}
+}
+
+static void yy_advance(void)
+{
+	if (!yyeof && yypos >= YY_LOOKAHEAD)
+		yy_fill_buf();
+	if (yypos < yyend) {
+		if (*yypos == '\n')
+			yyreallineno++;
+		yypos++;
+	}
+}
+
+static void yy_move_start(void)
+{
+	yysmark++;
+}
+
+static void yy_mark_start(void)
+{
+	yyemark = yysmark = yypos;
+	yylineno = yyreallineno;
+}
+
+static void yy_mark_end(void)
+{
+	yyprevlineno = yyreallineno;
+	yyemark = yypos;
+}
+
+static void yy_back_end(void)
+{
+	yyemark--;
+}
+
+static void yy_back(void)
+{
+	if (*yypos == '\n')
+		yyreallineno--;
+	yypos--;
+}
+
+static void yy_mark_pos(void)
+{
+	yyreallineno = yyprevlineno;
+	yypos = yyemark;
+}
+
+#define YY_TERMINAL		'\0'
+static char *yytermpos;		/* terminal postion */
+static char yytermchar;		/* backup char for original terminal postion */
+
+static void yy_term(void)
+{
+	yytermpos = yypos;
+	yytermchar = *yypos;
+	*yypos = YY_TERMINAL;
+}
+
+static void yy_unterm(void)
+{
+	if (yytermpos) {
+		*yytermpos = yytermchar;
+		yytermchar = YY_TERMINAL;
+		yytermpos = NULL;
+	}
+}
+
+/* state transition table */
+#define yy_next(state, c) com_table[row_map[state]][col_map[c]]
+
+%table
+
+
+/* accept anchor */
+#define YY_NOAC		0
+#define YY_AC_START	1
+#define YY_AC_END	2
+#define YY_AC_BOCH	3
+#define YY_AC_NONE	4
+
+%accept
+
+#define YYF		(-1)
+
+#ifdef USE_ECHO
+#define ECHO()	fprintf(yyout, "%s", yytext)
+#endif
+
+%state
+
+static void BEGIN(int state)
+{
+	yystartstate = state;
+}
+
+int yylex(void)
+{
+	static int yyfirst = 1;	/* first call yylex() */
+	int yystate;		/* current state */
+	int yyprev;		/* prev state */
+	int yynstate;		/* next state */
+	int yylastaccept;	/* last accept state */
+	int yyanchor;		/* accept anchor */
+	int yylook;		/* gotten char */
+
+	if (yyfirst) {
+		yy_init();
+		yyfirst = 0;
+	}
+
+	/* init */
+	yy_unterm();
+	yystate = yystartstate;
+	yyanchor = 0;
+	yylastaccept = -1;	/* NOTE: first state(0) can be acceptted */
+	yy_mark_start();
+
+	while (1) {
+		/* get next state according to lookaheah char */
+		yylook = yy_lookahead();
+
+		if (yylook == EOF) {
+			if (yylastaccept >= 0)
+				yynstate = YYF;
+			else {				
+				yytext = "";
+				yyleng = 0;
+				return 0;
+			}
+		} else {
+			int dsp = yylex_dsp[yystate];
+			int n = dsp + yylook;
+			if (n < 0 || n > sizeof(yylex_act) / sizeof(yylex_act[0]) || yylex_chk[n] != yylook)
+			{
+				yynstate = YYF;
+			}
+			else
+			{
+				yynstate = yylex_act[n];
+			}			
+		}
+		/* dbg("%d -> %d on [%c]", yystate, yynstate, yylook); */
+
+		if (yynstate == YYF) {
+			if (yylastaccept >= 0)
+				yy_mark_pos();
+			else
+				yy_advance();
+
+			/* handle ^ , $ operator */
+			if (yyanchor & YY_AC_START)
+				/* FIXME: '\n' is ignored */
+				yy_move_start();
+
+			if (yyanchor & YY_AC_END) {
+				yy_back_end();
+				yy_back();
+			}
+
+			yy_mark_end();
+			yy_term();
+			yytext = yy_text();
+			yyleng = yy_leng();
+
+			/* handle accept action */
+			switch (yylastaccept) {
+%action
+			default: {
+			#ifdef USE_ECHO
+				ECHO();
+			#else
+				yyerrx("Unrecognizable character, ascll code is %d", yytext[0]);
+				break;
+			#endif
+			}
+			}
+
+			yy_unterm();
+			yystate = yystartstate;
+			yylastaccept = -1;
+			yyanchor = 0;
+			yy_mark_start();
+		} else {
+			yy_advance();
+			yyanchor = yyaccept[yynstate];
+			/* Acceptable? */
+			if (yyanchor) {
+				yy_mark_end();
+				yylastaccept = yynstate;
+			}
+			yystate = yynstate;
+		}
+	}
+}
+
+%user_code

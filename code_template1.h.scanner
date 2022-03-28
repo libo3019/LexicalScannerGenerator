@@ -1,0 +1,11 @@
+#pragma once
+
+extern FILE *yyout;
+extern FILE *yyin;
+
+/* yylex() output text stream */
+extern char *yytext;
+extern int yyleng;
+extern int yylineno;
+
+%yylex_declaration
