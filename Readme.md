@@ -12,4 +12,4 @@ OPTIONS:<br>
 -v              vertion information<br>
 <br>
 e.g:<br>
-LexicalScannerGenerator test/colour.l -o colour.c<br>
+LexicalScannerGenerator -o colour.c colour.l <br>
