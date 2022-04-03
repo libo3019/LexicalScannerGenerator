@@ -218,11 +218,11 @@ static void yy_unterm(void)
 
 
 /* accept anchor */
-#define YY_NOAC		0
+#define YY_NOAC		-1
+#define YY_AC_NONE	0
 #define YY_AC_START	1
 #define YY_AC_END	2
 #define YY_AC_BOCH	3
-#define YY_AC_NONE	4
 
 %accept
 
@@ -278,7 +278,11 @@ int yylex(void)
 			int n = dsp + yylook;
 			if (n < 0 || n > sizeof(yylex_act) / sizeof(yylex_act[0]) || yylex_chk[n] != yylook)
 			{
+#ifdef UNDETERMINED_VERSION
+				yynstate = yylex_def[yystate];
+#else
 				yynstate = YYF;
+#endif
 			}
 			else
 			{
@@ -294,13 +298,16 @@ int yylex(void)
 				yy_advance();
 
 			/* handle ^ , $ operator */
-			if (yyanchor & YY_AC_START)
-				/* FIXME: '\n' is ignored */
-				yy_move_start();
+			if (yyanchor != YY_NOAC)
+			{
+				if (yyanchor & YY_AC_START)
+					/* FIXME: '\n' is ignored */
+					yy_move_start();
 
-			if (yyanchor & YY_AC_END) {
-				yy_back_end();
-				yy_back();
+				else if (yyanchor & YY_AC_END) {
+					yy_back_end();
+					yy_back();
+				}
 			}
 
 			yy_mark_end();
@@ -330,7 +337,7 @@ int yylex(void)
 			yy_advance();
 			yyanchor = yyaccept[yynstate];
 			/* Acceptable? */
-			if (yyanchor) {
+			if (yyanchor != YY_NOAC) {
 				yy_mark_end();
 				yylastaccept = yynstate;
 			}
