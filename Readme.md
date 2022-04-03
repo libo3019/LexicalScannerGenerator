@@ -1,7 +1,7 @@
 LexicalScannerGenerator is a lexical scanner generator, which is written by me with C++ language. It applies some algorithms of Regular/NFA/DFA and implements some basic functions like flex. The example file demonstrates how to apply the lexical scanner generator.
 
 The usage is as follows:<br>
-LexicalScannerGenerator script [OPTIONS]<br>
+LexicalScannerGenerator [OPTIONS] lex_file_name<br>
 OPTIONS:<br>
 -o file         specify code file<br>
 -c file         specify the c template file instead of code_template.c.scanner<br>
