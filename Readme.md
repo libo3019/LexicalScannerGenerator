@@ -6,9 +6,9 @@ OPTIONS:<br>
 <PRE>
 -o file
 	specify code file
--c file<br>
+-c file
 	specify the c template file instead of code_template.c.scanner
--h file<br>
+-h file
 	specify the h template file instead of code_template.h.scanner
 -m [0/1]
 	specify the compress mode
